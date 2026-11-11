@@ -1,4 +1,5 @@
 # Riseup VPN for Omarchy
+<img width="429" height="559" alt="screenshot-2026-11-11_08-33-01" src="https://github.com/user-attachments/assets/de15e50e-a87e-490f-9c4d-d38c1c2e0921" />
 
 Bar widget for [Omarchy](https://omarchy.org/): connect Riseup OpenVPN and
 toggle its nftables kill switch from the shell.
