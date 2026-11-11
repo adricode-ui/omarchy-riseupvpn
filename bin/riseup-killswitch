@@ -1,0 +1,35 @@
+#!/bin/bash
+# Simple kill switch for openvpn-client@riseup
+# Usage: riseup-killswitch on|off|status
+
+TABLE="inet riseup_ks"
+
+case "$1" in
+  on)
+    nft add table $TABLE 2>/dev/null || true
+    nft flush table $TABLE 2>/dev/null || true
+    nft add chain $TABLE output '{ type filter hook output priority 0; policy drop; }'
+    # Allow loopback
+    nft add rule $TABLE output oifname "lo" accept
+    # Allow the VPN interface
+    nft add rule $TABLE output oifname "tun0" accept
+    # Allow established/related
+    nft add rule $TABLE output ct state established,related accept
+    # Allow local network (adjust if your LAN is different)
+    nft add rule $TABLE output ip daddr 192.168.0.0/16 accept
+    nft add rule $TABLE output ip daddr 10.0.0.0/8 accept
+    nft add rule $TABLE output ip6 daddr fd00::/8 accept
+    echo "Kill switch ON (only tun0 + local allowed)"
+    ;;
+  off)
+    nft delete table $TABLE 2>/dev/null || true
+    echo "Kill switch OFF (normal traffic restored)"
+    ;;
+  status)
+    nft list table $TABLE 2>/dev/null && echo "Kill switch is ON" || echo "Kill switch is OFF"
+    ;;
+  *)
+    echo "Usage: $0 on|off|status"
+    exit 1
+    ;;
+esac

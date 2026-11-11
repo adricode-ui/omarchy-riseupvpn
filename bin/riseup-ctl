@@ -1,0 +1,409 @@
+#!/bin/bash
+# Status and toggles for openvpn-client@riseup and its nftables kill switch.
+#
+# This file, under the plugin, is the user-facing dispatcher. It never
+# re-executes itself through pkexec: a passwordless grant pointed at a
+# user-writable script would be a root shell.
+#
+# `sudo this-file setup` copies it to /usr/local/bin/riseup-ctl (root-owned),
+# copies bin/riseup-killswitch to /usr/local/bin/riseup-killswitch, writes the
+# ExecStartPost drop-in that arms the kill switch on VPN start, and installs a
+# polkit policy pinned to that path and to five fixed subcommands: status,
+# vpn-on, vpn-off, ks-on, ks-off. None of them takes caller-supplied arguments.
+
+set -u
+
+VERSION=1.0.0
+INSTALLED=/usr/local/bin/riseup-ctl
+UNIT=openvpn-client@riseup.service
+KS_BIN=/usr/local/bin/riseup-killswitch
+KS_DROPIN_DIR=/etc/systemd/system/openvpn-client@riseup.service.d
+KS_DROPIN=$KS_DROPIN_DIR/killswitch.conf
+STATE_DIR=/run/riseup-vpn
+STATE_FILE=$STATE_DIR/state
+ACTION_STATUS=org.quattro.riseup.status
+POLICY_DST=/usr/share/polkit-1/actions/org.quattro.riseup.policy
+RULES_DST=/etc/polkit-1/rules.d/49-quattro-riseup.rules
+
+self=$(readlink -f "$0")
+script_dir=$(dirname "$self")
+plugin_dir=$(dirname "$script_dir")
+
+installed_path=""
+if [[ -e $INSTALLED ]]; then
+  installed_path=$(readlink -f "$INSTALLED")
+fi
+
+vpn=unknown
+boot=false
+status_text=""
+tun=false
+address=""
+killswitch=unknown
+privileged=false
+helper_installed=false
+err=""
+detail=""
+
+sanitize() {
+  python3 -c 'import sys
+s = sys.stdin.read()
+out = []
+for ch in s:
+    o = ord(ch)
+    if 32 <= o < 127 and ch not in "<>&":
+        out.append(ch)
+    if len(out) >= 160:
+        break
+sys.stdout.write("".join(out))'
+}
+
+# Only the tokens the panel knows how to draw.
+take_vpn() {
+  case "$1" in
+    active|inactive|activating|deactivating|failed) printf '%s' "$1" ;;
+    *) printf 'unknown' ;;
+  esac
+}
+
+take_ks() {
+  case "$1" in
+    on|off) printf '%s' "$1" ;;
+    *) printf 'unknown' ;;
+  esac
+}
+
+read_common() {
+  local raw enabled addr
+  raw=$(systemctl is-active "$UNIT" 2>/dev/null || true)
+  raw=${raw//$'\n'/}
+  vpn=$(take_vpn "$raw")
+
+  enabled=$(systemctl is-enabled "$UNIT" 2>/dev/null || true)
+  enabled=${enabled//$'\n'/}
+  if [[ $enabled == "enabled" ]]; then
+    boot=true
+  else
+    boot=false
+  fi
+
+  raw=$(systemctl show "$UNIT" -p StatusText --value 2>/dev/null || true)
+  status_text=$(printf '%s' "$raw" | sanitize)
+
+  tun=false
+  address=""
+  if ip link show tun0 >/dev/null 2>&1; then
+    tun=true
+    addr=$(ip -4 -br addr show dev tun0 2>/dev/null | awk '{print $3; exit}')
+    addr=$(printf '%s' "$addr" | sanitize)
+    if [[ $addr =~ ^[0-9./]+$ ]]; then
+      address=$addr
+    fi
+  fi
+}
+
+read_ks_file() {
+  killswitch=unknown
+  [[ -r $STATE_FILE ]] || return 0
+  local ks
+  ks=$(python3 -c 'import json, sys
+try:
+    v = json.load(open(sys.argv[1])).get("killswitch", "")
+except Exception:
+    v = ""
+sys.stdout.write(v if v in ("on", "off") else "")' "$STATE_FILE" 2>/dev/null || true)
+  [[ -n $ks ]] && killswitch=$ks
+}
+
+query_ks() {
+  local errf
+  errf=$(mktemp)
+  if nft list table inet riseup_ks >/dev/null 2>"$errf"; then
+    killswitch=on
+  elif grep -q -e 'No such file' -e 'not found' "$errf"; then
+    killswitch=off
+  else
+    killswitch=unknown
+    err=ks-failed
+  fi
+  rm -f "$errf"
+}
+
+write_state() {
+  [[ ${EUID:-0} -eq 0 ]] || return 0
+  [[ $killswitch == "on" || $killswitch == "off" ]] || return 0
+  install -d -m 0755 "$STATE_DIR"
+  local tmp
+  tmp=$(mktemp "$STATE_DIR/state.XXXXXX")
+  jq -nc --arg killswitch "$killswitch" --argjson updated "$(date +%s)" \
+    '{killswitch:$killswitch, updated:$updated}' >"$tmp"
+  chmod 644 "$tmp"
+  mv -f "$tmp" "$STATE_FILE"
+}
+
+collect_unprivileged() {
+  err=""
+  detail=""
+  privileged=false
+  helper_installed=false
+  [[ -x $INSTALLED ]] && helper_installed=true
+  read_common
+  read_ks_file
+}
+
+collect_privileged() {
+  err=""
+  detail=""
+  privileged=true
+  helper_installed=true
+  read_common
+  query_ks
+  write_state
+}
+
+emit() {
+  local ok=$1
+  jq -nc \
+    --arg version "$VERSION" \
+    --arg vpn "$vpn" \
+    --arg statusText "$status_text" \
+    --arg address "$address" \
+    --arg killswitch "$killswitch" \
+    --arg error "$err" \
+    --arg detail "$detail" \
+    --argjson ok "$([[ $ok == 1 ]] && echo true || echo false)" \
+    --argjson boot "$([[ $boot == "true" ]] && echo true || echo false)" \
+    --argjson tun "$([[ $tun == "true" ]] && echo true || echo false)" \
+    --argjson privileged "$([[ $privileged == "true" ]] && echo true || echo false)" \
+    --argjson helperInstalled "$([[ $helper_installed == "true" ]] && echo true || echo false)" \
+    '{ok:$ok, version:$version, vpn:$vpn, boot:$boot, statusText:$statusText, tun:$tun, address:$address, killswitch:$killswitch, privileged:$privileged, helperInstalled:$helperInstalled, error:$error, detail:$detail}'
+}
+
+polkit_yes() {
+  [[ -x $INSTALLED ]] || return 1
+  local start
+  start=$(python3 -c 'import sys
+raw = open("/proc/%s/stat" % sys.argv[1]).read()
+rest = raw.rsplit(") ", 1)[1].split()
+print(rest[19])' "$$") || return 1
+  pkcheck --action-id "$ACTION_STATUS" --process "$$,${start},${UID}" >/dev/null 2>&1
+}
+
+user_status() {
+  if polkit_yes; then
+    local out rc=0
+    out=$(pkexec "$INSTALLED" status 2>/dev/null) || rc=$?
+    if [[ $rc -eq 0 && "$out" == \{* ]]; then
+      printf '%s\n' "$out"
+      return 0
+    fi
+  fi
+  collect_unprivileged
+  emit 1
+}
+
+run_vpn() {
+  local mode=$1 rc=0
+  if [[ $mode == "on" ]]; then
+    timeout 40 systemctl start "$UNIT" || rc=$?
+  else
+    timeout 20 systemctl stop "$UNIT" || rc=$?
+  fi
+  collect_privileged
+  if [[ $rc -ne 0 ]]; then
+    if [[ $mode == "on" ]]; then
+      err=start-failed
+    else
+      err=stop-failed
+    fi
+    detail=$(systemctl show "$UNIT" -p Result --value 2>/dev/null | sanitize || true)
+    emit 0
+    return 1
+  fi
+  emit 1
+}
+
+run_ks() {
+  local mode=$1
+  [[ $mode == "on" || $mode == "off" ]] || return 1
+  if [[ ! -x $KS_BIN ]] || ! "$KS_BIN" "$mode" >/dev/null 2>&1; then
+    collect_privileged
+    err=ks-failed
+    emit 0
+    return 1
+  fi
+  collect_privileged
+  emit 1
+}
+
+privileged_main() {
+  local cmd=${1:-}
+  case "$cmd" in
+    status)
+      collect_privileged
+      emit 1
+      ;;
+    vpn-on) run_vpn on ;;
+    vpn-off) run_vpn off ;;
+    ks-on) run_ks on ;;
+    ks-off) run_ks off ;;
+    *)
+      echo "unsupported" >&2
+      return 1
+      ;;
+  esac
+}
+
+invoking_user() {
+  local u=""
+  if [[ -n ${PKEXEC_UID:-} ]]; then
+    u=$(id -un "$PKEXEC_UID" 2>/dev/null || true)
+  elif [[ -n ${SUDO_USER:-} && $SUDO_USER != root ]]; then
+    u=$SUDO_USER
+  fi
+  [[ "$u" =~ ^[a-z_][a-z0-9_-]{0,31}$ ]] || return 1
+  printf '%s' "$u"
+}
+
+do_setup() {
+  local user policy rules ks_src
+  [[ ${EUID:-$(id -u)} -eq 0 ]] || {
+    echo "Run: sudo $self setup" >&2
+    return 1
+  }
+  user=$(invoking_user) || {
+    echo "Could not tell which account ran setup." >&2
+    return 1
+  }
+  policy=$plugin_dir/etc/polkit/org.quattro.riseup.policy
+  rules=$plugin_dir/etc/polkit/49-quattro-riseup.rules.in
+  ks_src=$plugin_dir/bin/riseup-killswitch
+  [[ -f $policy && -f $rules ]] || {
+    echo "Policy files are missing next to the plugin." >&2
+    return 1
+  }
+  [[ -f $ks_src ]] || {
+    echo "Kill switch script is missing next to the plugin." >&2
+    return 1
+  }
+  python3 -c 'import sys, xml.etree.ElementTree as ET; ET.parse(sys.argv[1])' "$policy" || return 1
+
+  install -o root -g root -m 0755 "$self" "$INSTALLED" || return 1
+  install -o root -g root -m 0755 "$ks_src" "$KS_BIN" || return 1
+  install -d -o root -g root -m 0755 "$KS_DROPIN_DIR" || return 1
+  printf '%s\n' '[Service]' 'ExecStartPost=/usr/local/bin/riseup-killswitch on' >"$KS_DROPIN" || return 1
+  chown root:root "$KS_DROPIN" || return 1
+  chmod 0644 "$KS_DROPIN" || return 1
+  systemctl daemon-reload || return 1
+  install -o root -g root -m 0644 "$policy" "$POLICY_DST" || return 1
+  sed "s/@RISEUP_USER@/${user}/g" "$rules" >"$RULES_DST" || return 1
+  chown root:root "$RULES_DST" || return 1
+  chmod 0644 "$RULES_DST" || return 1
+  if grep -q "@RISEUP_USER@" "$RULES_DST"; then
+    echo "The polkit rule still has a placeholder." >&2
+    return 1
+  fi
+
+  # polkitd watches these directories. A reload covers the copies that do not.
+  systemctl reload polkit.service 2>/dev/null || true
+  sleep 0.3
+  pkaction --action-id "$ACTION_STATUS" >/dev/null || {
+    echo "polkit did not register ${ACTION_STATUS}." >&2
+    return 1
+  }
+  echo "Riseup helper installed for ${user}."
+  echo "Kill switch installed at ${KS_BIN}."
+  echo "VPN start drop-in written to ${KS_DROPIN}."
+  echo "Passwordless toggles apply to that account on the local foreground session."
+  echo "Remove ${RULES_DST} to be asked for a password again."
+}
+
+public_ip() {
+  local ip=""
+  ip=$(curl -4 -fsS --max-time 5 --retry 0 -A "adri.vpn-killswitch" https://api.ipify.org 2>/dev/null || true)
+  ip=$(printf '%s' "$ip" | sanitize)
+  if [[ ! "$ip" =~ ^[0-9.]+$ ]]; then
+    ip=$(curl -6 -fsS --max-time 5 --retry 0 -A "adri.vpn-killswitch" https://api6.ipify.org 2>/dev/null || true)
+    ip=$(printf '%s' "$ip" | sanitize)
+  fi
+  if [[ "$ip" =~ ^[0-9.]+$ || "$ip" =~ ^[0-9A-Fa-f:]+$ ]]; then
+    jq -nc --arg ip "$ip" '{ok:true, ip:$ip, error:""}'
+  else
+    jq -nc '{ok:false, ip:"", error:"unreachable"}'
+  fi
+}
+
+dispatch_action() {
+  local cmd=$1
+  if [[ ! -x $INSTALLED ]]; then
+    collect_unprivileged
+    err=helper-not-installed
+    emit 0
+    return 1
+  fi
+  local out rc=0 errf
+  errf=$(mktemp)
+  out=$(pkexec "$INSTALLED" "$cmd" 2>"$errf") || rc=$?
+  rm -f "$errf"
+  if [[ "$out" == \{* ]]; then
+    printf '%s\n' "$out"
+    return "$rc"
+  fi
+  collect_unprivileged
+  if [[ $rc -eq 126 || $rc -eq 127 ]]; then
+    err=cancelled
+  else
+    err=generic
+  fi
+  emit 0
+  return 1
+}
+
+self_test() {
+  local s
+  s=$(printf '%s' '<img src="https://example.invalid/tracker">&' | sanitize)
+  [[ "$s" != *"<"* && "$s" != *">"* && "$s" != *"&"* ]] || {
+    echo "markup was not stripped: $s" >&2
+    return 1
+  }
+  s=$(printf '%s' 'Initialization Sequence Completed' | sanitize)
+  [[ "$s" == "Initialization Sequence Completed" ]] || {
+    echo "plain status was damaged: $s" >&2
+    return 1
+  }
+  collect_unprivileged
+  emit 1 | jq -e '.vpn and .killswitch and .ok == true' >/dev/null
+  echo "ok"
+}
+
+user_main() {
+  local cmd=${1:-status}
+  case "$cmd" in
+    status) user_status ;;
+    public-ip) public_ip ;;
+    self-test) self_test ;;
+    vpn-on|vpn-off|ks-on|ks-off)
+      # Root via this writable copy is refused. Setup is the only privileged
+      # entry here, and it only installs files.
+      if [[ ${EUID:-$(id -u)} -eq 0 ]]; then
+        echo "Refusing ${cmd} from the plugin copy. Use ${INSTALLED}." >&2
+        return 1
+      fi
+      dispatch_action "$cmd"
+      ;;
+    setup) do_setup ;;
+    *)
+      echo "Usage: $self status|public-ip|vpn-on|vpn-off|ks-on|ks-off|setup" >&2
+      return 1
+      ;;
+  esac
+}
+
+if [[ -n "$installed_path" && "$self" == "$installed_path" ]]; then
+  if [[ ${EUID:-$(id -u)} -ne 0 ]]; then
+    exec pkexec "$INSTALLED" "${1:-status}"
+  fi
+  privileged_main "${1:-status}"
+else
+  user_main "${1:-status}"
+fi

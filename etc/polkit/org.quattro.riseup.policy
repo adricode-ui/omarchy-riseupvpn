@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
+ "http://www.freedesktop.org/standards/PolicyKit/1.0/policyconfig.dtd">
+<!--
+  Local helper for the Riseup VPN bar plugin.
+  One action per subcommand, each pinned to that subcommand as argv1.
+  A double hyphen is illegal inside an XML comment and makes polkit ignore
+  the whole file. This comment avoids that sequence.
+-->
+<policyconfig>
+  <vendor>adri</vendor>
+  <vendor_url>https://riseup.net/</vendor_url>
+
+  <action id="org.quattro.riseup.status">
+    <description>Read Riseup VPN and kill switch status</description>
+    <message>Authentication is required to read the Riseup kill switch</message>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/local/bin/riseup-ctl</annotate>
+    <annotate key="org.freedesktop.policykit.exec.argv1">status</annotate>
+    <annotate key="org.freedesktop.policykit.exec.allow_gui">true</annotate>
+  </action>
+
+  <action id="org.quattro.riseup.vpn-on">
+    <description>Connect Riseup VPN</description>
+    <message>Authentication is required to connect Riseup VPN</message>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/local/bin/riseup-ctl</annotate>
+    <annotate key="org.freedesktop.policykit.exec.argv1">vpn-on</annotate>
+    <annotate key="org.freedesktop.policykit.exec.allow_gui">true</annotate>
+  </action>
+
+  <action id="org.quattro.riseup.vpn-off">
+    <description>Disconnect Riseup VPN</description>
+    <message>Authentication is required to disconnect Riseup VPN</message>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/local/bin/riseup-ctl</annotate>
+    <annotate key="org.freedesktop.policykit.exec.argv1">vpn-off</annotate>
+    <annotate key="org.freedesktop.policykit.exec.allow_gui">true</annotate>
+  </action>
+
+  <action id="org.quattro.riseup.ks-on">
+    <description>Turn the Riseup kill switch on</description>
+    <message>Authentication is required to turn the Riseup kill switch on</message>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/local/bin/riseup-ctl</annotate>
+    <annotate key="org.freedesktop.policykit.exec.argv1">ks-on</annotate>
+    <annotate key="org.freedesktop.policykit.exec.allow_gui">true</annotate>
+  </action>
+
+  <action id="org.quattro.riseup.ks-off">
+    <description>Turn the Riseup kill switch off</description>
+    <message>Authentication is required to turn the Riseup kill switch off</message>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/local/bin/riseup-ctl</annotate>
+    <annotate key="org.freedesktop.policykit.exec.argv1">ks-off</annotate>
+    <annotate key="org.freedesktop.policykit.exec.allow_gui">true</annotate>
+  </action>
+</policyconfig>

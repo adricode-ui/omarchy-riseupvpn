@@ -1,0 +1,19 @@
+// Installed by riseup-ctl setup. @RISEUP_USER@ is the account that ran it.
+// Grants the Riseup bar actions to that account only while they are on the
+// local, foreground session. Anyone else still gets the admin password prompt
+// from the policy defaults. Delete this file to be asked every time.
+// The grant covers only the actions in org.quattro.riseup.policy. Each one is
+// pinned to /usr/local/bin/riseup-ctl and a fixed subcommand, and that program
+// does not run anything its caller names.
+
+polkit.addRule(function(action, subject) {
+  if (action.id.indexOf("org.quattro.riseup.") !== 0) {
+    return polkit.Result.NOT_HANDLED;
+  }
+
+  if (subject.local && subject.active && subject.user === "@RISEUP_USER@") {
+    return polkit.Result.YES;
+  }
+
+  return polkit.Result.NOT_HANDLED;
+});
