@@ -30,8 +30,8 @@
   "panel.details": "Détails",
   "panel.service": "Service",
   "panel.boot": "Au démarrage",
-  "panel.bootOn": "démarre avec le système",
-  "panel.bootOff": "ne démarre pas",
+  "panel.bootOn": "OpenVPN démarre avec la machine. Cet interrupteur ne le connecte pas maintenant.",
+  "panel.bootOff": "OpenVPN reste coupé après un redémarrage jusqu’à ce que tu le lances ici.",
   "panel.tunnel": "Tunnel",
   "panel.noTunnel": "pas de tun0",
   "panel.openvpn": "OpenVPN",
@@ -40,7 +40,7 @@
   "panel.publicIpNone": "Indisponible",
   "panel.refreshIp": "Rafraîchir l’IP",
   "panel.setup": "Installer le contrôle sans mot de passe",
-  "panel.setupHint": "Les interrupteurs ont besoin d’un helper, une seule fois. Il demande le mot de passe dans un terminal, ensuite la barre peut basculer le VPN et le kill switch sans redemander.",
+  "panel.setupHint": "Les interrupteurs ont besoin d’un helper, une seule fois. Il demande le mot de passe dans un terminal, ensuite la barre peut basculer le VPN, le kill switch et le démarrage auto sans redemander.",
   "panel.stale": "Le helper installé est plus ancien que ce plugin. Relance l’installation.",
   "panel.coupling": "Connecter lance le kill switch. Déconnecter ne l’éteint pas.",
   "error.notInstalled": "Le helper sans mot de passe n’est pas encore installé.",
@@ -48,5 +48,6 @@
   "error.startFailed": "OpenVPN n’a pas démarré.",
   "error.stopFailed": "OpenVPN ne s’est pas arrêté.",
   "error.ksFailed": "La commande du kill switch a échoué.",
+  "error.bootFailed": "Impossible de changer le démarrage auto.",
   "error.generic": "Quelque chose s’est mal passé."
 }

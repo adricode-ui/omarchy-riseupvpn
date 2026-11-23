@@ -29,9 +29,9 @@
   "panel.leak": "VPN is up and the kill switch is off, so traffic can bypass the tunnel.",
   "panel.details": "Details",
   "panel.service": "Service",
-  "panel.boot": "At boot",
-  "panel.bootOn": "starts with the system",
-  "panel.bootOff": "does not start",
+  "panel.boot": "Start at boot",
+  "panel.bootOn": "OpenVPN starts when the machine boots. This does not connect it now.",
+  "panel.bootOff": "OpenVPN stays off after reboot until you connect it from here.",
   "panel.tunnel": "Tunnel",
   "panel.noTunnel": "no tun0",
   "panel.openvpn": "OpenVPN",
@@ -40,7 +40,7 @@
   "panel.publicIpNone": "Unavailable",
   "panel.refreshIp": "Refresh IP",
   "panel.setup": "Set up passwordless control",
-  "panel.setupHint": "Toggles need a one-time helper. It asks for your password in a terminal, then this bar can switch the VPN and the kill switch without asking again.",
+  "panel.setupHint": "Toggles need a one-time helper. It asks for your password in a terminal, then this bar can switch the VPN, the kill switch, and start-at-boot without asking again.",
   "panel.stale": "The installed helper is older than this plugin. Run setup again.",
   "panel.coupling": "Connecting runs the kill switch. Disconnecting does not turn it off.",
   "error.notInstalled": "Passwordless helper is not installed yet.",
@@ -48,5 +48,6 @@
   "error.startFailed": "OpenVPN did not start.",
   "error.stopFailed": "OpenVPN did not stop.",
   "error.ksFailed": "The kill switch command failed.",
+  "error.bootFailed": "Could not change the boot setting.",
   "error.generic": "Something went wrong."
 }

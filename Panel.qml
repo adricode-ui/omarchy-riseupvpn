@@ -34,6 +34,7 @@ Panel {
     if (host.lastError === "start-failed") return strings.t("error.startFailed")
     if (host.lastError === "stop-failed") return strings.t("error.stopFailed")
     if (host.lastError === "ks-failed") return strings.t("error.ksFailed")
+    if (host.lastError === "boot-failed") return strings.t("error.bootFailed")
     return strings.t("error.generic")
   }
 
@@ -46,6 +47,11 @@ Panel {
   function toggleKs() {
     if (!host || host.busy) return
     host.runAction(host.ksOn ? "ks-off" : "ks-on")
+  }
+
+  function toggleBoot() {
+    if (!host || host.busy) return
+    host.runAction(host.boot ? "boot-off" : "boot-on")
   }
 
   onOpenedChanged: {
@@ -127,6 +133,16 @@ Panel {
           onClicked: root.toggleKs()
         }
 
+        Toggle {
+          width: parent.width
+          label: strings.t("panel.boot")
+          description: !host ? "" : (host.boot ? strings.t("panel.bootOn") : strings.t("panel.bootOff"))
+          checked: host ? host.boot : false
+          foreground: root.fg
+          fontFamily: root.bar ? root.bar.fontFamily : Style.font.family
+          onClicked: root.toggleBoot()
+        }
+
         Text {
           width: parent.width
           visible: host && host.blocked
@@ -170,10 +186,6 @@ Panel {
         Kv {
           k: strings.t("panel.service")
           v: host ? root.stringsWord("vpn", host.vpn) : ""
-        }
-        Kv {
-          k: strings.t("panel.boot")
-          v: host && host.boot ? strings.t("panel.bootOn") : strings.t("panel.bootOff")
         }
         Kv {
           k: strings.t("panel.tunnel")

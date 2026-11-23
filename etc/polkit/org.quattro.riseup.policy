@@ -75,4 +75,30 @@
     <annotate key="org.freedesktop.policykit.exec.argv1">ks-off</annotate>
     <annotate key="org.freedesktop.policykit.exec.allow_gui">true</annotate>
   </action>
+
+  <action id="org.quattro.riseup.boot-on">
+    <description>Enable Riseup VPN at boot</description>
+    <message>Authentication is required to enable Riseup VPN at boot</message>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/local/bin/riseup-ctl</annotate>
+    <annotate key="org.freedesktop.policykit.exec.argv1">boot-on</annotate>
+    <annotate key="org.freedesktop.policykit.exec.allow_gui">true</annotate>
+  </action>
+
+  <action id="org.quattro.riseup.boot-off">
+    <description>Disable Riseup VPN at boot</description>
+    <message>Authentication is required to disable Riseup VPN at boot</message>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/local/bin/riseup-ctl</annotate>
+    <annotate key="org.freedesktop.policykit.exec.argv1">boot-off</annotate>
+    <annotate key="org.freedesktop.policykit.exec.allow_gui">true</annotate>
+  </action>
 </policyconfig>

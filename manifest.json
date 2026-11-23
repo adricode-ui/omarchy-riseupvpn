@@ -2,19 +2,19 @@
   "schemaVersion": 1,
   "id": "adri.vpn-killswitch",
   "name": "Riseup VPN",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "author": "adri",
   "license": "MIT",
   "homepage": "https://github.com/adricode-ui/omarchy-riseupvpn",
   "repository": "https://github.com/adricode-ui/omarchy-riseupvpn.git",
-  "description": "Connect or disconnect Riseup OpenVPN and toggle its nftables kill switch from the bar.",
+  "description": "Connect Riseup OpenVPN, toggle its nftables kill switch, and enable it at boot from the bar.",
   "kinds": ["bar-widget"],
   "entryPoints": {
     "barWidget": "BarWidget.qml"
   },
   "barWidget": {
     "displayName": "Riseup VPN",
-    "description": "VPN status, kill switch, and public IP.",
+    "description": "VPN status, kill switch, start at boot, and public IP.",
     "category": "Network",
     "aliases": ["vpn", "riseup", "openvpn", "kill switch", "firewall"],
     "allowMultiple": false,

@@ -8,12 +8,13 @@
 # `sudo this-file setup` copies it to /usr/local/bin/riseup-ctl (root-owned),
 # copies bin/riseup-killswitch to /usr/local/bin/riseup-killswitch, writes the
 # ExecStartPost drop-in that arms the kill switch on VPN start, and installs a
-# polkit policy pinned to that path and to five fixed subcommands: status,
-# vpn-on, vpn-off, ks-on, ks-off. None of them takes caller-supplied arguments.
+# polkit policy pinned to that path and to seven fixed subcommands: status,
+# vpn-on, vpn-off, ks-on, ks-off, boot-on, boot-off. None of them takes
+# caller-supplied arguments.
 
 set -u
 
-VERSION=1.0.0
+VERSION=1.1.0
 INSTALLED=/usr/local/bin/riseup-ctl
 UNIT=openvpn-client@riseup.service
 KS_BIN=/usr/local/bin/riseup-killswitch
@@ -236,6 +237,25 @@ run_ks() {
   emit 1
 }
 
+run_boot() {
+  local mode=$1 rc=0
+  [[ $mode == "on" || $mode == "off" ]] || return 1
+  # enable/disable only: do not start or stop the tunnel.
+  if [[ $mode == "on" ]]; then
+    timeout 10 systemctl enable "$UNIT" || rc=$?
+  else
+    timeout 10 systemctl disable "$UNIT" || rc=$?
+  fi
+  collect_privileged
+  if [[ $rc -ne 0 ]]; then
+    err=boot-failed
+    detail=$(systemctl is-enabled "$UNIT" 2>/dev/null | sanitize || true)
+    emit 0
+    return 1
+  fi
+  emit 1
+}
+
 privileged_main() {
   local cmd=${1:-}
   case "$cmd" in
@@ -247,6 +267,8 @@ privileged_main() {
     vpn-off) run_vpn off ;;
     ks-on) run_ks on ;;
     ks-off) run_ks off ;;
+    boot-on) run_boot on ;;
+    boot-off) run_boot off ;;
     *)
       echo "unsupported" >&2
       return 1
@@ -382,7 +404,7 @@ user_main() {
     status) user_status ;;
     public-ip) public_ip ;;
     self-test) self_test ;;
-    vpn-on|vpn-off|ks-on|ks-off)
+    vpn-on|vpn-off|ks-on|ks-off|boot-on|boot-off)
       # Root via this writable copy is refused. Setup is the only privileged
       # entry here, and it only installs files.
       if [[ ${EUID:-$(id -u)} -eq 0 ]]; then
@@ -393,7 +415,7 @@ user_main() {
       ;;
     setup) do_setup ;;
     *)
-      echo "Usage: $self status|public-ip|vpn-on|vpn-off|ks-on|ks-off|setup" >&2
+      echo "Usage: $self status|public-ip|vpn-on|vpn-off|ks-on|ks-off|boot-on|boot-off|setup" >&2
       return 1
       ;;
   esac

@@ -12,7 +12,7 @@ BarWidget {
   id: root
   moduleName: "adri.vpn-killswitch"
 
-  readonly property string pluginVersion: "1.0.0"
+  readonly property string pluginVersion: "1.1.0"
   readonly property string helper: Qt.resolvedUrl("bin/riseup-ctl").toString().replace(/^file:\/\//, "")
 
   property string vpn: "unknown"
@@ -161,7 +161,7 @@ BarWidget {
       var data = root.parsePayload(actionStdout.text)
       if (data) root.applyStatus(data)
       if (data && data.ok === false && data.error)
-        root.lastError = root.cleanToken(data.error, ["helper-not-installed", "cancelled", "start-failed", "stop-failed", "ks-failed", "generic"], "generic")
+        root.lastError = root.cleanToken(data.error, ["helper-not-installed", "cancelled", "start-failed", "stop-failed", "ks-failed", "boot-failed", "generic"], "generic")
       else if (!data || exitCode !== 0)
         root.lastError = (exitCode === 126 || exitCode === 127) ? "cancelled" : "generic"
       else

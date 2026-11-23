@@ -1,6 +1,8 @@
 # Riseup VPN for Omarchy
 
-<img width="423" height="571" alt="screenshot-2026-11-11_08-37-21" src="https://github.com/user-attachments/assets/9c4c96f9-445b-4e99-8e84-ad000df0e5b9" />
+<p align="center">
+  <img src="preview.png" alt="Riseup VPN panel with VPN, kill switch, and start-at-boot toggles" width="420">
+</p>
 
 Bar widget for [Omarchy](https://omarchy.org/): connect Riseup OpenVPN and
 toggle its nftables kill switch from the shell.
@@ -15,7 +17,7 @@ GUI is broken; use the command-line configurator instead.
 ## What you get
 
 - A bar icon for the tunnel (`󰖂`) plus a lock for the kill switch.
-- A click opens a panel: VPN toggle, kill switch toggle, public IP.
+- A click opens a panel: VPN toggle, kill switch toggle, start-at-boot toggle, public IP.
 - Connecting the VPN always turns the kill switch **on**.
 - Disconnecting the VPN does **not** turn the kill switch off. If it stays
   on, the Internet is blocked and only the local network still works.
@@ -152,7 +154,8 @@ sudo ~/.config/omarchy/plugins/adri.vpn-killswitch/bin/riseup-ctl setup
 The polkit rule is passwordless only for the account that ran `setup`, and
 only on the local foreground session. Each action is pinned to
 `/usr/local/bin/riseup-ctl` and to one subcommand (`status`, `vpn-on`,
-`vpn-off`, `ks-on`, `ks-off`). Extra arguments are ignored.
+`vpn-off`, `ks-on`, `ks-off`, `boot-on`, `boot-off`). Extra arguments are
+ignored.
 
 Until `setup` has been run, the icon still shows the VPN. The kill switch
 stays “unknown”, and the panel tells you to install the helper.
@@ -167,7 +170,11 @@ Left-click the bar icon.
 | --- | --- |
 | VPN toggle | `systemctl start` / `stop` `openvpn-client@riseup` |
 | Kill switch toggle | `/usr/local/bin/riseup-killswitch on` / `off` |
+| Start at boot | `systemctl enable` / `disable` `openvpn-client@riseup` (no `--now`) |
 | Refresh IP | `curl` to `https://api.ipify.org` (then `api6.ipify.org`) |
+
+Start at boot only changes whether the unit comes up after a reboot. It
+does not connect or disconnect the tunnel now.
 
 Public IP is fetched only when the panel opens or when you refresh it. The
 bar polls status every 3 seconds (`refreshIntervalSec` in `shell.json`,
@@ -211,9 +218,9 @@ Then reconnect from the panel (or `sudo systemctl restart openvpn-client@riseup`
 
 ### Polkit cost
 
-A program already running as the account that ran `setup` can flip the VPN
-and the kill switch without asking for a password. Same compromise as the
-Tor bar toggle. To be asked every time:
+A program already running as the account that ran `setup` can flip the VPN,
+the kill switch, and start-at-boot without asking for a password. Same
+compromise as the Tor bar toggle. To be asked every time:
 
 ```bash
 sudo rm /etc/polkit-1/rules.d/49-quattro-riseup.rules
